@@ -1,0 +1,73 @@
+services:
+
+  mysql:
+    image: mysql:8.4
+    container_name: booknest-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: booknest
+      MYSQL_USER: booknestuser
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - booknest-mysql-data:/var/lib/mysql
+    networks:
+      - booknest-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  product-service:
+    image: booknest-product-service:v1
+    container_name: booknest-product-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: booknest
+      DB_USER: booknestuser
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - booknest-network
+
+  order-service:
+    image: booknest-order-service:v1
+    container_name: booknest-order-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: booknest_orders
+      DB_USER: booknestuser
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - booknest-network
+
+  frontend:
+    image: booknest-frontend:v1
+    container_name: booknest-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - product-service
+      - order-service
+    networks:
+      - booknest-network
+
+volumes:
+  booknest-mysql-data:
+    external: true
+
+networks:
+  booknest-network:
+    external: true
